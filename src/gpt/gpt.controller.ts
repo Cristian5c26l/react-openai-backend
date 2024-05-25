@@ -1,7 +1,7 @@
-import { Body, Controller, HttpStatus, Post, Res } from '@nestjs/common';
+import { Body, Controller, Get, HttpStatus, Param, ParseIntPipe, Post, Res } from '@nestjs/common';
 import { GptService } from './gpt.service';
-import { OrthographyDto, ProsConsDiscusserDto, TranslateDto } from './dtos';
-import { Response } from 'express';
+import { OrthographyDto, ProsConsDiscusserDto, TextToAudioDto, TranslateDto } from './dtos';
+import type { Response } from 'express';// Se coloca Response como type porque en este archivo no se usa Response para crear instancias, solo para tener tipados
 
 @Controller('gpt')
 export class GptController {
@@ -53,6 +53,41 @@ export class GptController {
     @Body() translateDto: TranslateDto
   ){
     return this.gptService.translate(translateDto);
+  }
+
+  @Post('text-to-audio')
+  async textToAudio(
+    @Body() textToAudioDto: TextToAudioDto,
+    @Res() res: Response,
+  ){
+    const filePath = await this.gptService.textToAudio(textToAudioDto);
+
+    // Cambiar el contenido de la respuesta a traves del header Content-Type
+    res.setHeader('Content-Type', 'audio/mp3');
+    res.status(HttpStatus.OK);// Se hizo correctamente la peticion
+    res.sendFile(filePath);// Responder a la peticion con el archivo mp3
+
+  }
+
+  @Get('text-to-audio/:fileId')
+  async textToAudioGetter(
+    @Param('fileId', ParseIntPipe) fileId: number,// Lo que esta despues (que es dinamico) de /gpt/text-to-audio/ se almacena en fileId, y despues, se convierte a entero
+    @Res() res: Response,
+  ){
+    // console.log(fileId);
+    const { exists, filePath } = await this.gptService.textToAudioGetter(fileId) as { exists: boolean, filePath?: string };// filePath?: string indica que filePath es un string o un undefined (si es undefined indica que el objeto puede no venir con filePath)
+
+    if ( !exists ) {
+      res.setHeader('Content-Type', 'text/plain');
+      res.status(HttpStatus.NOT_FOUND);
+      res.send(`Audio ${fileId}.mp3 no encontrado en el servidor`);
+    } else {
+      // Cambiar el contenido de la respuesta a traves del header Content-Type
+      res.setHeader('Content-Type', 'audio/mp3');
+      res.status(HttpStatus.OK);// Se hizo correctamente la peticion
+      res.sendFile(filePath);// Responder a la peticion con el archivo mp3
+    }
+
   }
 
 
